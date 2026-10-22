@@ -1,9 +1,9 @@
-import streamlit as st
-import pandas as pd
-import numpy as np
-import joblib
 from pathlib import Path
 import os
+import joblib
+import numpy as np
+import pandas as pd
+import streamlit as st
 
 # Configuration de la page
 st.set_page_config(page_title="PrediQ-Ops | Predictive Maintenance", layout="wide")
@@ -11,19 +11,18 @@ st.set_page_config(page_title="PrediQ-Ops | Predictive Maintenance", layout="wid
 st.title("⚙️ PrediQ-Ops — Industrial Predictive Maintenance")
 st.markdown("Surveillance d'équipement en temps réel & calcul de probabilité de panne.")
 
-# 1. Chargement du modèle
-
-
+# 1. Chargement du modèle (robuste local + Cloud)
 @st.cache_resource
 def load_model():
-  # Cherche d'abord dans le dossier courant, sinon dans le home directory
-  local_path = Path("model.pkl")
-  home_path = Path.home() / "model.pkl"
-
-  if local_path.exists():
-    return joblib.load(local_path)
-  return joblib.load(home_path)
-
+    # Détection automatique du chemin absolu du fichier model.pkl
+    current_dir = Path(__file__).resolve().parent
+    model_path = current_dir / "model.pkl"
+    
+    # Fallback au cas où le modèle se trouve dans le dossier de travail courant
+    if not model_path.exists():
+        model_path = Path("model.pkl")
+        
+    return joblib.load(model_path)
 
 model = load_model()
 
@@ -62,7 +61,7 @@ input_data = pd.DataFrame([{
 # Alignement strict sur les colonnes du modèle
 input_data = input_data[model.feature_names_in_]
 
-# 4. Affichage des grandeurs dérivées
+# 4. Affichage des grandeurs physiques calculées
 col1, col2, col3 = st.columns(3)
 col1.metric("Puissance mécanique", f"{power_w:.1f} W")
 col2.metric("Gradient thermique (ΔT)", f"{temp_diff:.1f} K")
@@ -70,13 +69,13 @@ col3.metric("Indice contrainte outil", f"{wear_torque:.0f}")
 
 st.divider()
 
-# 5. Prédiction & Diagnostic
+# 5. Diagnostic et probabilité d'incident
 failure_prob = model.predict_proba(input_data)[0, 1]
 
 st.subheader("Diagnostic opérationnel")
 if failure_prob > 0.5:
     st.error(f"⚠️ **Risque critique de panne détecté : {failure_prob * 100:.1f} %**")
-    st.write("Action recommandée : arrêt préventif et inspection de l'organe moteur.")
+    st.write("Action recommandée : arrêt préventif immédiat et inspection de l'organe moteur.")
 elif failure_prob > 0.2:
     st.warning(f"⚡ **Vigilance accrue requise : {failure_prob * 100:.1f} %**")
     st.write("Action recommandée : surveillance rapprochée des paliers d'usure.")
